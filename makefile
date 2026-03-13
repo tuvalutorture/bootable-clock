@@ -15,7 +15,7 @@ $(IMG): $(BIN)
 	dd if=$(BIN) of=$(IMG) conv=notrunc
 
 run: $(IMG)
-	$(QEMU) -rtc base=localtime -fda $(IMG)
+	$(QEMU) -rtc base="2023-12-25T13:34:56" -fda $(IMG)
 
 clean:
 	rm -f $(BIN) $(IMG)

@@ -14,145 +14,102 @@ section .text
 start:
     jmp main
 
-; courtesy of the slop machine
-bcd_to_bin:
-    ; input: BCD in AL
-    ; output: binary in AL
-    push cx
-    mov ah, al         ; backup original BCD value
-    and al, 0x0F       ; isolate the lower nybble (units place)
-    mov bl, al         ; save units in BL
-    mov al, ah         ; restore original BCD
-    mov cx, 0x0A04
-    shr al, cl         ; shift down high nybble (tens place)
-    imul ch            ; multiply by 10
-    add al, bl         ; add units place
-    pop cx
+; put bcd value into al
+; get seperated bcd into ax
+; al goes from xxxx xxxx to ah: xxxx al: xxxx
+; written by human instead of slop machine
+split_bcd:
+    mov ah, al
+    shr ah, 1
+    shr ah, 1
+    shr ah, 1
+    shr ah, 1
+    and al, 0x0F
+    ret
+
+; just here to prevent repeating code
+print_digits:
+    mov dl, ah
+    add dl, 48
+    call print_char
+    inc ch
+
+    mov dl, al
+    add dl, 48
+    call print_char
+    inc ch
+
     ret
 
 print_time:
-    mov ax, 0x1700
-    call fill_screen
     mov dh, 0x17
 
-.print_hour:
+    ; hours
     mov al, [hour]
-    cmp al, 12
-    jna .print_leading_one
-    sub al, 12
+    call split_bcd
+    cmp ax, 0
+    jnz .pm_check
+    mov ax, 0x0102 ; print 12 if 00:xx
+    jmp .print_hour_digit
 
-.print_leading_one:
-    cmp al, 10
-    jnae .print_hour_digit
-
-    mov dl, 0x31
-    call print_char
-    inc ch
-
-    sub al, 10
+.pm_check:
+    cmp ax, 0x0102
+    jna .print_hour_digit
+    sub ax, 0x0102
 
 .print_hour_digit:
-    mov dl, al
-    add dl, 48
-    call print_char
-    inc ch
-
+    call print_digits
     mov dl, 0x3A
     call print_char
     inc ch
 
-.print_minute:
-    xor ax, ax
+; minutes
     mov al, [minute]
-    cmp al, 10
-    jnae .print_minute_digit
-
-.minute_loop:
-    inc ah
-    sub al, 10
-    cmp al, 10
-    jge .minute_loop
-
-.print_minute_digit:
-    mov dl, ah
-    add dl, 48
-    call print_char
-    inc ch
-    mov dl, al
-    add dl, 48
-    call print_char
-    inc ch
-
+    call split_bcd
+    call print_digits
     mov dl, 0x3A
     call print_char
     inc ch
 
-.print_second:
-    xor ax, ax
+; seconds
     mov al, [second]
-    cmp al, 10
-    jnae .print_second_digit
+    call split_bcd
+    call print_digits
 
-.second_loop:
-    inc ah
-    sub al, 10
-    cmp al, 10
-    jge .second_loop
-
-.print_second_digit:
-    mov dl, ah
-    add dl, 48
+; meridian (am/pm)
+    xor dl, dl
     call print_char
     inc ch
-    mov dl, al
-    add dl, 48
-    call print_char
-    inc ch
-
-.print_meridian_specifier:
-    mov dx, 0x1700
-    call print_char
-    inc ch
-    cmp byte [hour], 12
+    cmp byte [hour], 0x12
     jnae .print_am
-    mov dx, 0x1750 ; print pm
+    mov dl, 0x50 ; print pm
     jmp .print_m
 
 .print_am:
-    mov dx, 0x1741
+    mov dl, 0x41
 
 .print_m:
     call print_char
     inc ch
-    mov dx, 0x174D
+    mov dl, 0x4D
     call print_char
     inc ch
     call move_cursor
     ret
 
 main:
-    xor cx, cx
-    call move_cursor
-
-loop:
     mov ax, 0x0200
     int 0x1A
-    mov al, dh
-    call bcd_to_bin
-    cmp al, [second]
-    je .dont_bother
-    mov [second], al
+    cmp dh, [second]
+    je main
+    mov [second], dh
+    mov [hour], ch
+    mov [minute], cl
 
-    mov al, ch
-    call bcd_to_bin
-    mov [hour], al
-    mov al, cl
-    call bcd_to_bin
-    mov [minute], al
-
+    mov ax, 0x1700
+    call fill_screen
     call print_time
-.dont_bother:
-    jmp loop
+    jmp main
 
 times 510-($-$$) db 0
 dw 0AA55h

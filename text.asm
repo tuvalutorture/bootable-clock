@@ -8,7 +8,7 @@ scroll_screen:
 
     call set_screen_regs
 
-    mov cx, SCREEN_WIDTH * (SCREEN_HEIGHT - 1) * 2
+    mov cx, SCREEN_WIDTH * (SCREEN_HEIGHT - 1)
 
     push ds
     push si
@@ -17,20 +17,20 @@ scroll_screen:
     mov si, di
     add si, SCREEN_WIDTH * 2
 
-    rep movsb
+    rep movsw
 
     pop si
     pop ds
-    mov cx, SCREEN_WIDTH * 2
+    mov cx, SCREEN_WIDTH
 
     xor ax, ax
-    rep stosb
+    rep stosw
 
     pop cx
     ret
 
 ; set CH to X, CL to Y
-; sets AX to position
+; sets AX to position in memory
 calculate_position:
     push di
     xor ax, ax
@@ -116,13 +116,9 @@ move_cursor:
 
 ; set al to char, set ah to colour
 fill_screen:
-    mov cx, SCREEN_WIDTH * SCREEN_HEIGHT * 2
+    mov cx, SCREEN_WIDTH * SCREEN_HEIGHT
     call set_screen_regs
-.fill_screen_loop:
-    mov word [es:di], ax
-    inc di
-    inc di
-    loop .fill_screen_loop
+    rep stosw
     ret
 
 ; if anyone but me calls this there's an issue
