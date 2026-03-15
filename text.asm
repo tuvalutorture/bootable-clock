@@ -2,9 +2,22 @@ SCREEN_HEIGHT   EQU 25
 SCREEN_WIDTH    EQU 80
 SCREEN_MEM      EQU 0xB800
 
+colour db 0
+
+; ax - ah bg, al fg
+set_colour:
+    mov byte [colour], ah
+    shl byte [colour], 1
+    shl byte [colour], 1
+    shl byte [colour], 1
+    shl byte [colour], 1
+    add byte [colour], al
+    ret
+
 ; no arguments needed here, just call
 scroll_screen:
     push cx
+    push di
 
     call set_screen_regs
 
@@ -23,9 +36,11 @@ scroll_screen:
     pop ds
     mov cx, SCREEN_WIDTH
 
-    xor ax, ax
+    mov ah, [colour]
+    xor al, al
     rep stosw
 
+    pop di
     pop cx
     ret
 
@@ -59,20 +74,32 @@ calculate_position:
     pop di
     ret
 
+; CX = X, Y
+; sets AX to current position in the buffer
+; modifies CX
+increment_position:
+    inc ch
+    cmp ch, SCREEN_WIDTH
+    jnae .increment_position_return
+    xor ch, ch
+    inc cl
+    cmp cl, SCREEN_HEIGHT
+    jnae .increment_position_return
+    call scroll_screen
+    mov cl, 24
+.increment_position_return:
+    call calculate_position
+    ret
+
 ; how to call:
 ; set ES to 0xB800
 ; set DH to your colour (bg == upper 4 bits, fg == lower 4 bits), set DL to your char
 ; set CH to X, CL to Y
 print_char:
     push ax
-    push di
-
     call calculate_position
     mov di, ax
-
     mov word [es:di], dx
-
-    pop di
     pop ax
     ret
 
@@ -113,6 +140,38 @@ move_cursor:
     pop ax
     ret
 
+; DS = segment, SI = memaddr, CX = x, y
+print_str:
+    call set_screen_regs
+    call calculate_position
+.print_loop:
+    mov di, ax
+    lodsb
+    cmp al, 0 ; best be some C strings boy, fuck you pascal
+    jz .print_ret
+
+.print_carriage_return:
+    cmp al, 13
+    jne .print_new_line
+    xor ch, ch
+    call calculate_position
+    jmp .print_loop
+
+.print_new_line:
+    cmp al, 10
+    jne .print_text
+    mov ch, 79
+    call increment_position
+    jmp .print_loop
+
+.print_text:
+    mov ah, [colour]
+    stosw
+    call increment_position
+    jmp .print_loop
+.print_ret:
+    call move_cursor
+    ret
 
 ; set al to char, set ah to colour
 fill_screen:

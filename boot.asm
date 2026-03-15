@@ -3,15 +3,15 @@ bits 16
 cpu 8086
 entry: jmp start
 
-%include "text.asm"
-
-section .data
 hour db 0
 minute db 0
 second db 0
 
-section .text
+%include "text.asm"
+
 start:
+    mov ax, 0x0107
+    call set_colour
     jmp main
 
 ; put bcd value into al
@@ -42,7 +42,7 @@ print_digits:
     ret
 
 print_time:
-    mov dh, 0x17
+    mov dh, [colour]
 
     ; hours
     mov al, [hour]
@@ -55,6 +55,14 @@ print_time:
 .pm_check:
     cmp ax, 0x0102
     jna .print_hour_digit
+    cmp byte [hour], 0x22 ; fuckery to get around 8/9 pm
+    jnl .sub_twelve
+    cmp byte [hour], 0x20
+    jl .sub_twelve
+    add al, 0x08
+    xor ah, ah
+    jmp .print_hour_digit
+.sub_twelve:
     sub ax, 0x0102
 
 .print_hour_digit:
@@ -95,6 +103,7 @@ print_time:
     call print_char
     inc ch
     call move_cursor
+
     ret
 
 main:
@@ -106,7 +115,8 @@ main:
     mov [hour], ch
     mov [minute], cl
 
-    mov ax, 0x1700
+    mov ah, [colour]
+    xor al, al
     call fill_screen
     call print_time
     jmp main
